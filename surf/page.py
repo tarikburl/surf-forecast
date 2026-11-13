@@ -1,4 +1,4 @@
-"""Render the phone page: one self-contained HTML file, no JavaScript."""
+"""Render the site: self-contained HTML pages, no JavaScript."""
 from html import escape
 
 import pandas as pd
@@ -16,6 +16,9 @@ body { margin:0; padding:16px; background:var(--page); color:var(--ink);
   font:15px/1.4 -apple-system, system-ui, sans-serif; }
 header { max-width:1100px; margin:0 auto 12px; }
 h1 { font-size:20px; margin:0; } h2 { font-size:16px; margin:0; }
+nav { display:flex; gap:4px; margin:8px 0; border-bottom:1px solid var(--line); }
+nav a { padding:6px 12px; color:var(--ink2); text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-1px; }
+nav a.on { color:var(--ink); border-bottom-color:var(--series); font-weight:600; }
 .sub, .meta, th, .lowconf { color:var(--ink2); font-size:13px; }
 main { display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
   max-width:1100px; margin:0 auto; }
@@ -137,13 +140,32 @@ def card(con, key, spot, now):
     return "".join(out) + "</section>"
 
 
-def render(con, spots, now):
-    """The whole page as an HTML string. `now` is a naive UTC Timestamp."""
-    stamp = local(now.strftime(fetch.TIME_FMT))
-    cards = "".join(card(con, key, s, now) for key, s in spots.items())
+def shell(title, active, sub, body, extra_css=""):
+    """Wrap a page body in the shared head, header and tab links."""
+    tabs = "".join(
+        f'<a href="{href}"' + (' class="on" aria-current="page"' if href == active else "")
+        + f'>{label}</a>' for href, label in (("index.html", "Forecast"),
+                                              ("how.html", "How it works")))
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width, initial-scale=1">'
-            f'<title>Surf</title><style>{CSS}</style></head><body>'
-            f'<header><h1>Surf</h1><div class="sub">Updated {stamp:%a %b %-d, %-I:%M %p} Pacific. '
-            f'Face height, typical waves to sets. Charts: solid is the CDIP nearshore '
-            f'model, dashed is long range.</div></header><main>{cards}</main></body></html>')
+            f'<title>{title}</title><style>{CSS}{extra_css}</style></head><body>'
+            f'<header><h1>Surf</h1><nav>{tabs}</nav><div class="sub">{sub}</div></header>'
+            f'{body}</body></html>')
+
+
+def render(con, spots, now):
+    """The forecast page as an HTML string. `now` is a naive UTC Timestamp."""
+    stamp = local(now.strftime(fetch.TIME_FMT))
+    cards = "".join(card(con, key, s, now) for key, s in spots.items())
+    return shell("Surf", "index.html",
+                 f"Updated {stamp:%a %b %-d, %-I:%M %p} Pacific. Face height, typical waves "
+                 f"to sets. Charts: solid is the CDIP nearshore model, dashed is long range.",
+                 f"<main>{cards}</main>")
+
+
+def render_how(con, spots, now):
+    """The 'How it works' page as an HTML string."""
+    from surf import how
+    return shell("Surf: how it works", "how.html",
+                 "Where the numbers come from and how they are calculated.",
+                 how.body(con, spots, now), how.CSS)

@@ -108,13 +108,14 @@ def cmd_now(args):
 
 
 def cmd_page(args):
-    """Write the phone page from stored data."""
+    """Write the site (forecast page and how-it-works page) from stored data."""
     from surf import page
-    out = store.DB.parent.parent / "site" / "index.html"
-    out.parent.mkdir(exist_ok=True)
-    out.write_text(page.render(store.connect(), load_spots(),
-                               pd.Timestamp.now("UTC").tz_localize(None)))
-    print(f"wrote {out}")
+    site = store.DB.parent.parent / "site"
+    site.mkdir(exist_ok=True)
+    con, spots, now = store.connect(), load_spots(), pd.Timestamp.now("UTC").tz_localize(None)
+    (site / "index.html").write_text(page.render(con, spots, now))
+    (site / "how.html").write_text(page.render_how(con, spots, now))
+    print(f"wrote {site}/index.html and how.html")
     return 0
 
 
@@ -264,7 +265,7 @@ def main():
     sub.add_parser("fetch", help="fetch all sources and store them").set_defaults(
         func=cmd_fetch)
     sub.add_parser("now", help="current surf at every spot").set_defaults(func=cmd_now)
-    sub.add_parser("page", help="write site/index.html").set_defaults(func=cmd_page)
+    sub.add_parser("page", help="write the site into site/").set_defaults(func=cmd_page)
     p = sub.add_parser("log", help="record a session you saw or surfed")
     p.add_argument("spot")
     p.add_argument("low", type=float, help="typical face height, ft")

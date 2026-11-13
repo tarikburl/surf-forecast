@@ -22,7 +22,8 @@ def swell_trains(freq, bandwidth, energy, direction):
     its peaks; neighbours are merged while the valley between them is shallow,
     a piece is too small, or there are too many pieces.
 
-    Returns a list of {hs (m), tp (s), dp (deg)}, largest first. The trains
+    Returns a list of {hs (m), tp (s), dp (deg), bands (first, past-last
+    band index)}, largest first. The trains
     together hold all the energy: sqrt(sum hs^2) equals the total Hs.
     """
     f, w, e, d = (np.asarray(x, float) for x in (freq, bandwidth, energy, direction))
@@ -53,8 +54,8 @@ def swell_trains(freq, bandwidth, energy, direction):
         weight, rad = e[p] * w[p], np.radians(d[p])
         dp = np.degrees(np.arctan2((weight * np.sin(rad)).sum(),
                                    (weight * np.cos(rad)).sum())) % 360
-        trains.append({"hs": 4 * m0(p) ** 0.5,
-                       "tp": 1 / f[p][np.argmax(e[p])], "dp": float(dp)})
+        trains.append({"hs": 4 * m0(p) ** 0.5, "tp": 1 / f[p][np.argmax(e[p])],
+                       "dp": float(dp), "bands": (p.start, p.stop)})
     return sorted(trains, key=lambda t: -t["hs"])
 
 
@@ -80,16 +81,18 @@ def surf_height(mop_row, spot):
 
     Returns {low, high (m), trains, chop_hs (m)}: low is the typical breaker
     height, high is the set waves (SET_FACTOR * low). Each train carries its
-    hs/tp/dp at the MOP point and its breaker height hb.
+    hs/tp/dp at the MOP point, its window weight, deep-water height h0 and
+    breaker height hb.
     """
     f, w, e, d = (np.array(json.loads(mop_row[c]))
                   for c in ("freq", "bandwidth", "energy", "direction"))
     swell = f <= 1 / MIN_SURF_PERIOD
     trains = swell_trains(f[swell], w[swell], e[swell], d[swell])
     for t in trains:
-        h = t["hs"] * window_weight(t["dp"], spot["window"])
-        h0 = physics.deep_water_height(h, t["tp"], spot["mop_depth_m"])
-        t["hb"] = float(physics.breaking_height(h0, t["tp"]))
+        t["weight"] = window_weight(t["dp"], spot["window"])
+        t["h0"] = float(physics.deep_water_height(
+            t["hs"] * t["weight"], t["tp"], spot["mop_depth_m"]))
+        t["hb"] = float(physics.breaking_height(t["h0"], t["tp"]))
     hb = sum(t["hb"] ** 2 for t in trains) ** 0.5
     low = spot.get("a", 1.0) * hb ** spot.get("b", 1.0)
     return {"low": low, "high": SET_FACTOR * low, "trains": trains,
