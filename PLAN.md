@@ -97,11 +97,11 @@ Error budget, in rough order: (1) offshore forecast error beyond about 3 days, w
 **Checkpoint:** user opens the page on their phone and sees it refresh on schedule.
 
 ### Chunk 5: Log and calibration
-- `surf log <spot> <low> <high>`: one line appends a timestamped observation (ft) to SQLite.
-- Pull MOP hindcast for the times of logged sessions; fit $a, b$ per spot once a spot has about 15 observations; until then keep defaults.
-- Backtest report: MAE in ft, bias, percent within 1 ft, calibrated vs uncalibrated.
+- `surf log <spot> <low> <high> [--time "YYYY-MM-DD HH:MM"] [--note ...]`: appends one observed session (face height, ft) to `log.csv` in the repo root. A committed CSV, not SQLite, because the database is not shared between this Mac and GitHub.
+- `surf calibrate [--write]`: for each spot with 15+ sessions, downloads the MOP nowcast row for each session time (the nowcast file goes back to 2025-04), fits $a$ (and $b$ from 40 sessions), and scores current vs new on the most recent 30% of sessions. `--write` saves a fit to `spots.toml` only if it is no worse on those unseen sessions.
+- After logging or calibrating, commit and push `log.csv` and `spots.toml` so the live page uses them.
 
-**Checkpoint:** logging works in one command; with seeded or real observations the report runs and calibrated error on held-out data is no worse than uncalibrated.
+**Checkpoint:** logging works in one command; on a seeded log the report runs against real past model data and the new fit beats the current one on unseen sessions.
 
 ### Chunk 6: Skill tracking (after a few weeks of logs)
 - Compare each logged session with what the stored forecasts said 1, 3 and 5 days before.

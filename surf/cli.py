@@ -1,10 +1,10 @@
-"""Command line: surf fetch | surf now | surf forecast <spot> | surf page"""
+"""Command line: surf fetch | now | forecast <spot> | page | log | calibrate"""
 import argparse
 
 import pandas as pd
 
-from surf import fetch, forecast, model, store
-from surf.forecast import FT, KT, STALE_HOURS, compass, local, wind_kind
+from surf import calibrate, fetch, forecast, model, spots as spots_mod, store
+from surf.forecast import FT, KT, PACIFIC, STALE_HOURS, compass, local, wind_kind
 from surf.spots import load_spots
 
 NOWCAST_HOURS = 72
@@ -198,6 +198,66 @@ def cmd_forecast(args):
     return 0
 
 
+def cmd_log(args):
+    """Record a session: surf log linda 3 4 [--time "2026-11-13 08:30"]"""
+    spots = load_spots()
+    key = find_spot(spots, args.spot)
+    when = (pd.Timestamp(args.time, tz=PACIFIC) if args.time
+            else pd.Timestamp.now(PACIFIC)).tz_convert("UTC")
+    if when > pd.Timestamp.now("UTC"):
+        raise SystemExit("that time is in the future")
+    calibrate.append_log(key, args.low, args.high, when.strftime(fetch.TIME_FMT),
+                         args.note, args.log)
+    n = int((calibrate.read_log(args.log).spot == key).sum())
+    print(f"logged {spots[key]['name']}: {args.low:g}-{args.high:g} ft at "
+          f"{when.tz_convert(PACIFIC):%a %b %-d %-I:%M %p} Pacific "
+          f"({n} session{'s' * (n != 1)} at this spot; calibration starts at "
+          f"{calibrate.MIN_OBS})")
+    return 0
+
+
+def cmd_calibrate(args):
+    """Compare logged sessions with the model and refit each spot's a, b."""
+    spots = load_spots()
+    log = calibrate.read_log(args.log)
+    con = store.connect()
+    text = spots_mod.SPOTS_FILE.read_text()
+    changed = []
+    print(f"{len(log)} logged sessions\n")
+    for key, s in spots.items():
+        mine = log[log.spot == key]
+        a_now, b_now = s.get("a", 1.0), s.get("b", 1.0)
+        if len(mine) < calibrate.MIN_OBS:
+            print(f"{s['name']}: {len(mine)} sessions, need {calibrate.MIN_OBS}. "
+                  f"Keeping a={a_now:.2f}, b={b_now:.2f}.")
+            continue
+        hb = calibrate.raw_heights(con, s, mine.time)
+        ok = ~pd.isna(hb) & (hb > 0)
+        obs = ((mine.low_ft + mine.high_ft) / 2).values[ok]
+        if ok.sum() < calibrate.MIN_OBS:
+            print(f"{s['name']}: only {ok.sum()} sessions have model data. Keeping current.")
+            continue
+        r = calibrate.evaluate(hb[ok], obs, a_now, b_now)
+        better = r["fitted"]["mae"] <= r["current"]["mae"]
+        print(f"{s['name']}: {r['n']} sessions; scored on the most recent "
+              f"{r['n'] - int(r['n'] * 0.7)}, which the new fit never saw")
+        for label, m, a, b in (("current", r["current"], a_now, b_now),
+                               ("new fit", r["fitted"], r["a"], r["b"])):
+            print(f"  {label}  a={a:.2f} b={b:.2f}   error {m['mae']:.1f} ft, "
+                  f"bias {m['bias']:+.1f} ft, {m['within_1ft']:.0f}% within 1 ft")
+        if better:
+            text = calibrate.set_spot_values(text, key, a=r["a"], b=r["b"])
+            changed.append(key)
+        else:
+            print("  new fit is not better on unseen sessions; keeping current")
+    if changed and args.write:
+        spots_mod.SPOTS_FILE.write_text(text)
+        print(f"\nupdated spots.toml for: {', '.join(changed)}")
+    elif changed:
+        print(f"\nwould update: {', '.join(changed)}. Run again with --write to save.")
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(prog="surf")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -205,6 +265,18 @@ def main():
         func=cmd_fetch)
     sub.add_parser("now", help="current surf at every spot").set_defaults(func=cmd_now)
     sub.add_parser("page", help="write site/index.html").set_defaults(func=cmd_page)
+    p = sub.add_parser("log", help="record a session you saw or surfed")
+    p.add_argument("spot")
+    p.add_argument("low", type=float, help="typical face height, ft")
+    p.add_argument("high", type=float, help="set face height, ft")
+    p.add_argument("--time", help='Pacific time, "YYYY-MM-DD HH:MM" (default: now)')
+    p.add_argument("--note", default="")
+    p.add_argument("--log", default=calibrate.LOG, help=argparse.SUPPRESS)
+    p.set_defaults(func=cmd_log)
+    p = sub.add_parser("calibrate", help="refit height scaling from logged sessions")
+    p.add_argument("--write", action="store_true", help="save better fits to spots.toml")
+    p.add_argument("--log", default=calibrate.LOG, help=argparse.SUPPRESS)
+    p.set_defaults(func=cmd_calibrate)
     p = sub.add_parser("forecast", help="forecast table and chart for one spot")
     p.add_argument("spot", help="spot name or part of it, e.g. 'ocean' or 'linda'")
     p.set_defaults(func=cmd_forecast)

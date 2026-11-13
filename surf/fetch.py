@@ -70,16 +70,26 @@ def parse_mop(text):
     return df[good].reset_index(drop=True)
 
 
-def fetch_mop(mop_id, kind, last=None):
+def fetch_mop(mop_id, kind, last=None, rows=None):
     """kind is 'nowcast' (hourly, buoy-driven) or 'forecast' (3-hourly).
-    last = number of most recent time steps to fetch (None = all)."""
+    last = number of most recent time steps to fetch; rows = (i, j) fetches
+    that inclusive index range instead. Neither = the whole file."""
     base = f"{MOP_URL}/{mop_id}_{kind}.nc"
-    n = int(re.search(r"waveTime = (\d+)", get(base + ".dds").text).group(1))
-    t = f"[{max(0, n - last) if last else 0}:{n - 1}]"
+    if rows:
+        t = f"[{rows[0]}:{rows[1]}]"
+    else:
+        n = int(re.search(r"waveTime = (\d+)", get(base + ".dds").text).group(1))
+        t = f"[{max(0, n - last) if last else 0}:{n - 1}]"
     query = ",".join([f"waveTime{t}", f"waveFlagPrimary{t}", f"waveHs{t}",
                       f"waveTp{t}", f"waveDp{t}", f"waveEnergyDensity{t}",
                       f"waveMeanDirection{t}", "waveBandwidth"])
     return parse_mop(get(f"{base}.ascii?{query}", timeout=60).text)
+
+
+def fetch_mop_times(mop_id, kind):
+    """Every time step in a MOP file, as pandas Timestamps (UTC, naive)."""
+    text = get(f"{MOP_URL}/{mop_id}_{kind}.nc.ascii?waveTime", timeout=60).text
+    return pd.to_datetime(parse_dap_ascii(text)["waveTime"], unit="s")
 
 
 # --- NDBC buoys (measured, for sanity checks) --------------------------------
