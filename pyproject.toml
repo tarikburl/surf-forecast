@@ -1,0 +1,19 @@
+[project]
+name = "surf"
+version = "0.1.0"
+description = "Per-spot surf height forecast from CDIP MOP"
+requires-python = ">=3.12"
+dependencies = ["requests", "numpy", "pandas", "matplotlib"]
+
+[project.scripts]
+surf = "surf.cli:main"
+
+[dependency-groups]
+dev = ["pytest"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

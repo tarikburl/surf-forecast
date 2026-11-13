@@ -1,0 +1,99 @@
+# One table per spot. Directions are degrees true, the direction waves come FROM.
+# mop / mop_depth_m / shore_normal come from the live CDIP MOP files.
+# window and notes are guesses until the user confirms them.
+# a is a provisional height scale factor, fitted 2026-11-13 to one week of
+# Surfline's published heights. Replace with a fit to logged sessions (Chunk 5).
+
+[ocean_beach]
+name = "Ocean Beach, SF"
+lat = 37.755
+lon = -122.512
+mop = "SF026"
+a = 0.81
+mop_depth_m = 10.0
+shore_normal = 261
+window = [200, 320]
+tide_station = "9414290"
+buoys = ["46237", "46026"]
+notes = "Open to everything, all tides"
+
+[rockaway]
+name = "Rockaway, Pacifica"
+lat = 37.609
+lon = -122.497
+mop = "SM387"
+a = 0.82
+mop_depth_m = 15.0
+shore_normal = 289
+window = [220, 320]
+tide_station = "9414290"
+buoys = ["46237", "46026"]
+notes = ""
+
+[linda_mar]
+name = "Linda Mar, Pacifica"
+lat = 37.594
+lon = -122.503
+mop = "SM376"
+a = 0.52
+mop_depth_m = 15.0
+shore_normal = 339
+window = [250, 320]
+tide_station = "9414290"
+buoys = ["46237", "46026"]
+notes = "Sheltered by Pedro Point; smaller than neighbors"
+
+[montara]
+name = "Montara"
+lat = 37.547
+lon = -122.515
+mop = "SM338"
+a = 0.63
+mop_depth_m = 15.0
+shore_normal = 302
+window = [220, 320]
+tide_station = "9414290"
+buoys = ["46237", "46026"]
+notes = "Usually the biggest of the group"
+
+[four_mile]
+name = "Four Mile, Santa Cruz"
+lat = 36.965
+lon = -122.124
+mop = "SC204"
+a = 0.87
+mop_depth_m = 15.0
+shore_normal = 190
+window = [180, 310]
+tide_max = 1.1
+tide_station = "9413450"
+buoys = ["46042", "46236"]
+notes = "Low to mid tide"
+
+[steamer_lane]
+name = "Steamer Lane, Santa Cruz"
+lat = 36.951
+lon = -122.026
+mop = "SC149"
+a = 1.25
+mop_depth_m = 15.0
+shore_normal = 128
+window = [180, 300]
+tide_max = 1.1
+tide_station = "9413450"
+buoys = ["46042", "46236"]
+notes = "NW swell wraps in; low to mid tide"
+
+[pleasure_point]
+name = "Pleasure Point, Santa Cruz"
+lat = 36.954
+lon = -121.971
+mop = "SC117"
+a = 0.93
+mop_depth_m = 15.0
+shore_normal = 158
+window = [180, 290]
+tide_max = 1.1
+tide_station = "9413450"
+buoys = ["46042", "46236"]
+notes = "Smaller than the Lane on NW swell; lower tide"

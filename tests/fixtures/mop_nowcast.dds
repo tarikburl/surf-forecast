@@ -1,0 +1,74 @@
+Dataset {
+    Int32 waveTime[waveTime = 14202];
+    Int32 waveTimeBounds[waveTime = 14202][metaBoundsCount = 2];
+    Byte waveFlagPrimary[waveTime = 14202];
+    Byte waveFlagSecondary[waveTime = 14202];
+    Float32 waveHs[waveTime = 14202];
+    Float32 waveTp[waveTime = 14202];
+    Float32 waveTa[waveTime = 14202];
+    Float32 waveDp[waveTime = 14202];
+    String waveModelInputSource[waveTime = 14202];
+    Float32 waveDm[waveTime = 14202];
+    Float32 waveSxy[waveTime = 14202];
+    Float32 waveSxx[waveTime = 14202];
+    Float32 waveFrequency[waveFrequency = 20];
+    Float32 waveFrequencyBounds[waveFrequency = 20][metaBoundsCount = 2];
+    Byte waveFrequencyFlagPrimary[waveFrequency = 20];
+    Byte waveFrequencyFlagSecondary[waveFrequency = 20];
+    Float32 waveBandwidth[waveFrequency = 20];
+    Grid {
+     ARRAY:
+        Float32 waveEnergyDensity[waveTime = 14202][waveFrequency = 20];
+     MAPS:
+        Int32 waveTime[waveTime = 14202];
+        Float32 waveFrequency[waveFrequency = 20];
+    } waveEnergyDensity;
+    Grid {
+     ARRAY:
+        Float32 waveMeanDirection[waveTime = 14202][waveFrequency = 20];
+     MAPS:
+        Int32 waveTime[waveTime = 14202];
+        Float32 waveFrequency[waveFrequency = 20];
+    } waveMeanDirection;
+    Grid {
+     ARRAY:
+        Float32 waveA1Value[waveTime = 14202][waveFrequency = 20];
+     MAPS:
+        Int32 waveTime[waveTime = 14202];
+        Float32 waveFrequency[waveFrequency = 20];
+    } waveA1Value;
+    Grid {
+     ARRAY:
+        Float32 waveB1Value[waveTime = 14202][waveFrequency = 20];
+     MAPS:
+        Int32 waveTime[waveTime = 14202];
+        Float32 waveFrequency[waveFrequency = 20];
+    } waveB1Value;
+    Grid {
+     ARRAY:
+        Float32 waveA2Value[waveTime = 14202][waveFrequency = 20];
+     MAPS:
+        Int32 waveTime[waveTime = 14202];
+        Float32 waveFrequency[waveFrequency = 20];
+    } waveA2Value;
+    Grid {
+     ARRAY:
+        Float32 waveB2Value[waveTime = 14202][waveFrequency = 20];
+     MAPS:
+        Int32 waveTime[waveTime = 14202];
+        Float32 waveFrequency[waveFrequency = 20];
+    } waveB2Value;
+    Grid {
+     ARRAY:
+        Float32 waveModelBinInputCoverage[waveTime = 14202][waveFrequency = 20];
+     MAPS:
+        Int32 waveTime[waveTime = 14202];
+        Float32 waveFrequency[waveFrequency = 20];
+    } waveModelBinInputCoverage;
+    String metaSiteLabel;
+    Float32 metaLatitude;
+    Float32 metaLongitude;
+    Float32 metaWaterDepth;
+    Float32 metaShoreNormal;
+    String metaGridMapping;
+} cdip/model/MOP_alongshore/SF026_nowcast.nc;
