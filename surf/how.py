@@ -1,5 +1,5 @@
-"""Render the 'How it works' page: where the data comes from and how a surf
-height is calculated, with a worked example from the latest stored data."""
+"""Render the 'How it works' page: the breaking-height equation from first
+physical reasoning, today's numbers put through it, and the raw data behind it."""
 import json
 import math
 from html import escape
@@ -34,6 +34,12 @@ pre { background:var(--page); border:1px solid var(--line); border-radius:6px;
 .curve { fill:none; stroke-width:2; }
 .sea { fill:var(--sea); } .bed { fill:var(--bed); }
 .mark { stroke:var(--ink); stroke-width:1; } svg text.lbl { fill:var(--ink); font-size:9.5px; }
+.eq { overflow-x:auto; margin:10px 0; text-align:center; }
+.eq math { font-size:17px; }
+.eq.box { border:1.5px solid var(--ink); border-radius:8px; padding:10px 6px; }
+.calc { font-family:ui-monospace, Menlo, monospace; font-size:12.5px; line-height:1.7; overflow-x:auto; white-space:nowrap; }
+article ul, article ol { margin:6px 0; padding-left:20px; } article li { margin:4px 0; }
+article sub, article sup { line-height:0; }
 """
 
 
@@ -79,8 +85,9 @@ def path_diagram():
         x += 1.5
     surface = " ".join(pts)
     seabed = " ".join(f"{x},{bed(x):.1f}" for x in range(0, W + 1, 10))
-    marks = [(40, "Buoys", "deep water"), (205, "CDIP point", "10 to 15 m deep"),
-             (288, "Breaks", "surf height")]
+    b = '<tspan dy="2" font-size="7">b</tspan>'
+    marks = [(40, "Deep water", "H\u2080, c\u2080"), (205, "CDIP point", "H at depth h"),
+             (288, "Break", f"H{b}")]
     out = [f'<svg viewBox="0 0 {W} {H}" role="img" aria-label="Path of a swell from deep water to the beach">',
            f'<polygon class="sea" points="{surface} '
            + " ".join(f"{x},{bed(x):.1f}" for x in range(300, -1, -10)) + '"/>',
@@ -133,13 +140,44 @@ def breaking_chart():
         out.append(f'<polyline class="curve" style="stroke:var(--{var})" points="'
                    + " ".join(f"{x(a):.1f},{y(b):.1f}" for a, b in pts) + '"/>')
         out.append(f'<text class="lbl" x="{x(12) + 3:.1f}" y="{y(pts[-1][1]) + 3:.1f}">{period} s</text>')
-    out.append(f'<text x="{(L + W - R) / 2}" y="{H - 4}" text-anchor="middle">open-ocean swell height (ft)</text></svg>')
+    out.append(f'<text x="{(L + W - R) / 2}" y="{H - 4}" text-anchor="middle">deep-water swell height (ft)</text></svg>')
     return "".join(out)
 
 
+# --- equations (MathML: renders natively, no JavaScript) ---------------------
+
+def mi(x): return f"<mi>{x}</mi>"
+def mn(x): return f"<mn>{x}</mn>"
+def mo(x): return f"<mo>{x}</mo>"
+def row(*xs): return "<mrow>" + "".join(xs) + "</mrow>"
+def sub(a, b): return f"<msub>{a}{b}</msub>"
+def sup(a, b): return f"<msup>{a}{b}</msup>"
+def subsup(a, b, c): return f"<msubsup>{a}{b}{c}</msubsup>"
+def frac(a, b): return f"<mfrac>{a}{b}</mfrac>"
+def sqrt(*xs): return "<msqrt>" + "".join(xs) + "</msqrt>"
+def paren(*xs): return row(mo("("), *xs, mo(")"))
+
+
+def eq(*xs, box=False):
+    """One displayed equation."""
+    return (f'<div class="eq{" box" if box else ""}"><math display="block">'
+            + row(*xs) + "</math></div>")
+
+
+Hb, H0, H = sub(mi("H"), mi("b")), sub(mi("H"), mn(0)), mi("H")
+c0 = sub(mi("c"), mn(0))
+TH02 = paren(mi("T"), subsup(mi("H"), mn(0), mn(2)))
+EQ_RESULT = eq(Hb, mo("="), mn("0.39"), sup(mi("g"), frac(mn(1), mn(5))),
+               sup(TH02, frac(mn(2), mn(5))), box=True)
+EQ_DESHOAL = eq(H0, mo("="), H, sqrt(frac(row(mi("c"), paren(mi("h"))), c0)), mo(","),
+                c0, mo("="), frac(row(mi("g"), mi("T")), row(mn(4), mi("&pi;"))))
+EQ_COMBINE = eq(Hb, mo("="), sqrt(subsup(mi("H"), row(mi("b"), mo(","), mn(1)), mn(2)), mo("+"),
+                                  subsup(mi("H"), row(mi("b"), mo(","), mn(2)), mn(2)),
+                                  mo("+"), mo("&hellip;")))
+
+
 def worked_example(con, spots, now):
-    """Live walk-through of the latest stored data for the first spot that has
-    some. Returns HTML, or a short note if nothing is stored yet."""
+    """Today's numbers put through the equations, for the first spot with data."""
     for key, s in spots.items():
         m = store.read(con, "SELECT * FROM mop WHERE mop=? AND kind='nowcast' "
                        "ORDER BY time DESC LIMIT 1", (s["mop"],))
@@ -147,43 +185,38 @@ def worked_example(con, spots, now):
             break
     else:
         return '<p class="note">No wave data stored yet, so there is no live example.</p>'
-    row, surf = m.iloc[0], model.surf_height(m.iloc[0], s)
-    trains, a = surf["trains"], s.get("a", 1.0)
-    hb = sum(t["hb"] ** 2 for t in trains) ** 0.5
-    keys = "".join(
-        f'<tr><td><span class="key k{i + 1}"></span>Swell {i + 1}</td>'
-        f'<td>{t["hs"] * FT:.1f} ft</td><td>{t["tp"]:.0f} s</td>'
-        f'<td>{compass(t["dp"])} {t["dp"]:.0f}&deg;</td></tr>' for i, t in enumerate(trains))
-    if surf["chop_hs"] * FT >= 0.5:
-        keys += (f'<tr><td><span class="key kc"></span>Wind chop</td>'
-                 f'<td>{surf["chop_hs"] * FT:.1f} ft</td><td>under {model.MIN_SURF_PERIOD:.0f} s</td>'
-                 f'<td>not counted</td></tr>')
-    steps = "".join(
-        f'<tr><td><span class="key k{i + 1}"></span>Swell {i + 1}</td>'
-        f'<td>{t["hs"] * FT:.1f}</td><td>{t["weight"]:.2f}</td>'
-        f'<td>{t["h0"] * FT:.1f}</td><td>{t["hb"] * FT:.1f}</td></tr>'
-        for i, t in enumerate(trains))
+    r, surf = m.iloc[0], model.surf_height(m.iloc[0], s)
+    trains, a, h = surf["trains"], s.get("a", 1.0), s["mop_depth_m"]
+    total = sum(t["hb"] ** 2 for t in trains) ** 0.5
+    rows = "".join(
+        f'<tr><td><span class="key k{i + 1}"></span>{i + 1}</td><td>{t["hs"]:.2f} m</td>'
+        f'<td>{t["tp"]:.1f} s</td><td>{compass(t["dp"])} {t["dp"]:.0f}&deg;</td>'
+        f'<td>{t["h0"]:.2f} m</td><td>{t["hb"]:.2f} m</td></tr>' for i, t in enumerate(trains))
+    t = trains[0]
+    c_deep, c_here = physics.G * t["tp"] / (4 * math.pi), physics.group_velocity(t["tp"], h)
+    window = "" if t["weight"] == 1 else f' &times; {t["weight"]:.2f} (window)'
+    combine = "" if len(trains) == 1 else (
+        "<p>Combine the swells: &radic;(" + " + ".join(f'{x["hb"]:.2f}&sup2;' for x in trains)
+        + f") = {total:.2f} m.</p>")
+    chop = "" if surf["chop_hs"] * FT < 0.5 else (
+        f' Grey bars are chop under {model.MIN_SURF_PERIOD:.0f} s '
+        f'({surf["chop_hs"]:.1f} m), left out.')
     return f"""
-<p>This example is live. It uses the most recent CDIP nowcast for
-<b>{escape(s["name"])}</b>, model point <code>{s["mop"]}</code> in {s["mop_depth_m"]:.0f} m of water,
-for {local(row["time"]):%a %b %-d, %-I %p} Pacific.</p>
-<h3>1. Start with the energy at each wave period</h3>
-<p>CDIP reports how much wave energy arrives in each of {len(json.loads(row["freq"]))} period bands.
-The total is a {row["hs"] * FT:.1f} ft sea. The code cuts that into separate swells at the dips
-between peaks.</p>
-{spectrum_chart(row, trains)}
-<div class="wrap"><table><tr><th></th><th>Height</th><th>Period</th><th>From</th></tr>{keys}</table></div>
-<h3>2. Take each swell to the break</h3>
-<div class="wrap"><table><tr><th></th><th>At point</th><th>Window</th>
-<th>Deep water</th><th>Breaking</th></tr>{steps}</table></div>
-<p class="note">Heights in feet: at the CDIP point, converted to the deep-water equivalent, then
-at breaking. Window is 1 when the swell's direction is inside the spot's swell window of
-{s["window"][0]} to {s["window"][1]}&deg;, and fades to 0 over 20&deg; outside it.</p>
-<h3>3. Combine and scale</h3>
-<p>The swells combine by energy (square, add, square root) to <b>{hb * FT:.1f} ft</b>.
-The spot's scale factor is {a:.2f}, giving <b>{surf["low"] * FT:.1f} ft</b> for a typical wave.
-Sets are 1.27 times that: <b>{surf["high"] * FT:.1f} ft</b>.
-The page shows <b>{surf["low"] * FT:.0f}-{surf["high"] * FT:.0f} ft</b>.</p>"""
+<p>{escape(s["name"])}, {local(r["time"]):%a %b %-d, %-I %p} Pacific. CDIP point
+<code>{s["mop"]}</code>, depth h = {h:.0f} m. These numbers refresh with the page.</p>
+{spectrum_chart(r, trains)}
+<p class="note">Energy at each wave period, from CDIP. Each colour is one swell.{chop}</p>
+<div class="wrap"><table><tr><th>Swell</th><th>H</th><th>T</th><th>From</th>
+<th>H<sub>0</sub></th><th>H<sub>b</sub></th></tr>{rows}</table></div>
+<h3>Swell 1, step by step</h3>
+<p class="calc">c<sub>0</sub> = gT/4&pi; = 9.81 &times; {t["tp"]:.1f} / 12.57 = {c_deep:.1f} m/s<br>
+c(h) = {c_here:.1f} m/s<br>
+H<sub>0</sub> = {t["hs"]:.2f}{window} &times; &radic;({c_here:.1f}/{c_deep:.1f}) = {t["h0"]:.2f} m<br>
+H<sub>b</sub> = 0.39 &times; 9.81<sup>1/5</sup> &times; ({t["tp"]:.1f} &times; {t["h0"]:.2f}<sup>2</sup>)<sup>2/5</sup> = {t["hb"]:.2f} m</p>
+{combine}
+<p>Scale by a = {a:.2f}: {surf["low"]:.2f} m = <b>{surf["low"] * FT:.1f} ft</b>, the typical wave.
+Sets: 1.27 &times; that = <b>{surf["high"] * FT:.1f} ft</b>.
+The forecast tab shows <b>{surf["low"] * FT:.0f}-{surf["high"] * FT:.0f} ft</b>.</p>"""
 
 
 def spot_table(spots):
@@ -192,91 +225,91 @@ def spot_table(spots):
         f'<tr><td>{escape(s["name"].split(",")[0])}</td><td><code>{s["mop"]}</code></td>'
         f'<td>{s["window"][0]}-{s["window"][1]}&deg;</td>'
         f'<td>{s.get("a", 1.0):.2f}</td><td>{n.get(k, 0)}</td></tr>' for k, s in spots.items())
-    return ('<div class="wrap"><table><tr><th>Spot</th><th>Point</th>'
-            f'<th>Window</th><th>Scale</th><th>Logged</th></tr>{rows}</table></div>')
+    return ('<div class="wrap"><table><tr><th>Spot</th><th>Point</th><th>Window</th>'
+            f'<th>a</th><th>Logged</th></tr>{rows}</table></div>')
 
 
 def body(con, spots, now):
+    grow = (2 ** 0.4 - 1) * 100
+    b8, b16 = (physics.breaking_height(6 / FT, T) * FT for T in (8, 16))
     return f"""
 <article>
-<section><h2>The short version</h2>
-<p>Scripps runs a wave model with an output point just off every beach in California. This site
-reads the swell at the point nearest each spot, works out how big that swell breaks, and scales
-the answer per spot. Wind and tide come from two other free sources. The numbers come from
-measurements, published models and a few fixed formulas. No AI is involved in producing them.</p>
+<section><h2>The idea</h2>
+<p>A swell carries energy toward the beach. In shallow water it slows down, so the same energy
+piles into a taller wave. It breaks when it's about as tall as the water is deep.</p>
 {path_diagram()}
-<p class="note">Offshore buoys measure the swell in deep water. CDIP's model carries it past
-headlands and islands to a point in 10 to 15 m of water. This site does the last step, from that
-point to the breaking wave.</p></section>
+<p class="note">Buoys measure the swell in deep water. Scripps' CDIP model carries it to a point
+10 to 15 m deep off each spot. This site does the last step.</p></section>
 
-<section><h2>Where the data comes from</h2>
-<h3>Swell: CDIP MOP nearshore model</h3>
-<p>From the <a href="https://cdip.ucsd.edu">Coastal Data Information Program</a> at Scripps.
-The "nowcast" is driven by what buoys are measuring this hour. The "forecast" runs about six days
-ahead in three-hour steps. Each time step gives a wave height, peak period, direction, and the
-energy in each period band.</p>
-<pre>{mop_sample()}</pre>
-<p class="note">Raw response for Ocean Beach's point, three hourly steps. waveTime is seconds since
-1970, waveHs is height in metres, waveTp is period in seconds, waveDp is the direction the swell
-comes from. Each waveEnergyDensity row is one hour: energy at each period band, long periods first.</p>
+<section><h2>The equation</h2>
+<p>Two facts set the size. The swell's energy flux stays roughly constant on the way in. And a
+wave breaks once its height nears the water depth. Together they give the breaking height
+H<sub>b</sub> from the deep-water height H<sub>0</sub> and the period T:</p>
+{EQ_RESULT}
+<p class="note">Komar and Gaughan (1973). g = 9.81 m/s&sup2;. The 0.39 was fitted to measured
+breakers. Heights in metres, T in seconds.</p>
+<p>Period matters. Double it and the wave breaks {grow:.0f}% bigger.</p>
+{breaking_chart()}
+<p class="note">Breaking height against deep-water swell height, both in feet. A 6 ft swell
+breaks at {b8:.0f} ft at 8 s and {b16:.0f} ft at 16 s.</p></section>
 
-<h3>Buoys: NOAA National Data Buoy Center</h3>
-<p>Used as a check that the model agrees with measurements, from
-<a href="https://www.ndbc.noaa.gov/station_page.php?station=46237">ndbc.noaa.gov</a>.</p>
-<pre>{sample("buoy_46237.spec", 5)}</pre>
-<p class="note">San Francisco Bar buoy. WVHT is total wave height in metres, SwH and SwP are swell
-height and period, WWH and WWP are wind-wave height and period, MWD is the mean direction.</p>
+<section><h2>The recipe</h2>
+<ol>
+<li><b>Split.</b> CDIP gives wave energy by period. Cut it into separate swells at the dips
+between peaks. Drop chop under {model.MIN_SURF_PERIOD:.0f} s. Fade out any swell from outside the
+spot's direction window.</li>
+<li><b>Convert to deep water.</b> CDIP's height H is at depth h, where the swell has already
+changed height. Undo that with the same flux rule. Here c is the speed the swell's energy
+travels.
+{EQ_DESHOAL}</li>
+<li><b>Break.</b> Put H<sub>0</sub> and T into the boxed equation for each swell.</li>
+<li><b>Combine.</b> Energies add, so heights add in quadrature.
+{EQ_COMBINE}</li>
+<li><b>Scale.</b> Each spot has a fitted factor a. The typical wave is a&middot;H<sub>b</sub>.
+Sets are 1.27 times that, the average of the biggest tenth of waves in a random sea.</li>
+</ol></section>
 
-<h3>Tides: NOAA CO-OPS</h3>
-<p>High and low tide predictions from
-<a href="https://tidesandcurrents.noaa.gov">tidesandcurrents.noaa.gov</a>, San Francisco station
-for the northern spots and Monterey for Santa Cruz. Heights between highs and lows are filled in
-with a smooth cosine curve.</p>
-<pre>{json_sample("tides_9414290.json")}</pre>
-<p class="note">t is the time in UTC, v is the height in metres above the average lowest tide,
-type is H for high or L for low.</p>
-
-<h3>Wind and long-range swell: Open-Meteo</h3>
-<p>Hourly wind from <a href="https://open-meteo.com">open-meteo.com</a>, and its global swell
-forecast for the dashed long-range part of each chart.</p>
-<pre>{json_sample("wind.json")}</pre>
-<p class="note">Wind speed and gusts in metres per second, direction in degrees the wind blows
-from. The site converts to knots.</p></section>
-
-<section><h2>How a surf height is calculated</h2>
+<section><h2>Today's numbers</h2>
 {worked_example(con, spots, now)}</section>
 
-<section><h2>Why period matters so much</h2>
-<p>The breaking height comes from a standard formula (Komar and Gaughan, 1973):</p>
-<div class="formula">H<sub>b</sub> = 0.39 &middot; g<sup>1/5</sup> &middot; (T &middot; H<sub>0</sub><sup>2</sup>)<sup>2/5</sup></div>
-<p>H<sub>0</sub> is the swell height in deep water, T is its period, g is gravity, and H<sub>b</sub>
-is the height when it breaks. A long-period swell carries more energy for the same height, so it
-grows more as it slows down in shallow water.</p>
-{breaking_chart()}
-<p class="note">Breaking height in feet (vertical) against open-ocean swell height. A 6 ft swell
-breaks at about {physics.breaking_height(6 / FT, 8) * FT:.0f} ft at 8 seconds and about
-{physics.breaking_height(6 / FT, 16) * FT:.0f} ft at 16 seconds.</p>
-<p>Before using the formula, the height at the CDIP point is converted back to its deep-water
-equivalent, because a swell has already started to change height by the time it reaches 10 to
-15 m of water. That step uses linear wave theory.</p></section>
+<section><h2>The data</h2>
+<h3>Swell: CDIP nearshore model</h3>
+<p><a href="https://cdip.ucsd.edu">cdip.ucsd.edu</a>. Hourly "nowcast" driven by buoys, plus a
+six-day forecast in three-hour steps.</p>
+<pre>{mop_sample()}</pre>
+<p class="note">Three hourly steps for Ocean Beach. waveTime: seconds since 1970. waveHs:
+height, m. waveTp: period, s. waveDp: direction the swell comes from. Each energy row is one
+hour, long periods first.</p>
+<h3>Buoys: NOAA NDBC</h3>
+<p><a href="https://www.ndbc.noaa.gov/station_page.php?station=46237">ndbc.noaa.gov</a>.
+A check on the model.</p>
+<pre>{sample("buoy_46237.spec", 5)}</pre>
+<p class="note">San Francisco Bar. WVHT: total height, m. SwH, SwP: swell height and period.
+WWH, WWP: wind-wave height and period. MWD: mean direction.</p>
+<h3>Tides: NOAA CO-OPS</h3>
+<p><a href="https://tidesandcurrents.noaa.gov">tidesandcurrents.noaa.gov</a>. Highs and lows;
+a cosine curve fills in between.</p>
+<pre>{json_sample("tides_9414290.json")}</pre>
+<p class="note">t: UTC time. v: metres above mean lower low water. type: H or L.</p>
+<h3>Wind and long-range swell: Open-Meteo</h3>
+<p><a href="https://open-meteo.com">open-meteo.com</a>. Hourly wind, and the swell behind the
+dashed part of each chart.</p>
+<pre>{json_sample("wind.json")}</pre>
+<p class="note">Speed and gusts in m/s. Direction is where the wind blows from.</p></section>
 
 <section><h2>Per-spot settings</h2>
 {spot_table(spots)}
-<p class="note">Point is the CDIP model point used. Window is the range of swell directions that
-reach the spot. Logged is the number of observed sessions recorded so far. The scale factors were first set by matching one week of Surfline's published
-heights in November 2026. They are replaced by a fit to logged sessions once a spot has
-{calibrate.MIN_OBS} of them.</p></section>
+<p class="note">Point: the CDIP model point. Window: swell directions that reach the spot.
+a: the scale factor. Logged: sessions recorded. The a values started as a match to one week of
+Surfline's heights. A fit to logged sessions replaces each one at {calibrate.MIN_OBS} sessions.</p></section>
 
-<section><h2>Ratings, and what to distrust</h2>
-<p><b>Ratings</b> reflect wind and tide only. Light wind is best, then offshore, cross-shore and
-onshore, and stronger is worse. Under 2 ft is "flat". Some spots are marked down at higher tides.
-A "good" rating says nothing about whether the size is surfable.</p>
-<p><b>Wind chop</b> with a period under {model.MIN_SURF_PERIOD:.0f} seconds is left out of the surf height.</p>
-<p><b>The long-range part</b> of each chart comes from a coarse global model, scaled to agree
-with CDIP where the two overlap. Treat it as a rough guide.</p>
-<p><b>Known weak points:</b> heights tend to read high on ordinary days; cove spots such as Linda
-Mar are modelled from a point outside the cove; and very large swells are outside the range the
-breaking formula was built for.</p>
-<p class="note">Code and data history:
-<a href="https://github.com/tarikburl/surf-forecast">github.com/tarikburl/surf-forecast</a></p></section>
+<section><h2>Limits</h2>
+<ul>
+<li>Heights read high on ordinary days and low on the biggest.</li>
+<li>Linda Mar's CDIP point sits outside the cove.</li>
+<li>A very large swell is already breaking at the CDIP point. The formula isn't built for that.</li>
+<li>Ratings use wind and tide only. A clean 20 ft day still says "good".</li>
+<li>Past six days the forecast comes from a coarse global model. Rough guide only.</li>
+</ul>
+<p class="note">Code: <a href="https://github.com/tarikburl/surf-forecast">github.com/tarikburl/surf-forecast</a></p></section>
 </article>"""

@@ -34,7 +34,9 @@ def test_how_page_renders_without_and_with_data(tmp_path):
     con.execute("INSERT INTO mop SELECT mop, 'nowcast', time, hs, tp, dp, freq, bandwidth, "
                 "energy, direction FROM mop WHERE time='2026-01-01T00:00'")
     html = page.render_how(con, SPOTS, now)
-    assert "Test &amp; Spot" in html and "Combine and scale" in html
+    assert "Test &amp; Spot" in html and "step by step" in html
+    assert html.count("<math") == 3 and "0.39" in html and "\u2014" not in html
     assert html.count("<svg") == 3 and "<script" not in html
     assert 'href="how.html" class="on"' in html
     assert 'href="index.html" class="on"' in page.render(con, SPOTS, now)
+

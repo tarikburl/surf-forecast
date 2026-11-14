@@ -167,5 +167,5 @@ def render_how(con, spots, now):
     """The 'How it works' page as an HTML string."""
     from surf import how
     return shell("Surf: how it works", "how.html",
-                 "Where the numbers come from and how they are calculated.",
+                 "The equation, today's numbers, and the raw data.",
                  how.body(con, spots, now), how.CSS)
