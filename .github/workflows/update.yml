@@ -2,9 +2,11 @@ name: update
 
 on:
   schedule:
-    # Twice an hour. GitHub drops scheduled runs when it is busy (only 1 of 7
-    # hourly runs fired on the first day), so extra attempts keep the page fresh.
-    - cron: "23,53 * * * *"
+    # Three updates a day: about 5 AM, 11 AM and 5 PM Pacific (cron is UTC, so
+    # these land an hour later in summer). GitHub sometimes drops a scheduled
+    # run, so each has one backup 40 minutes later.
+    - cron: "17 1,13,19 * * *"
+    - cron: "57 1,13,19 * * *"
   workflow_dispatch:
   push:
     branches: [main]
