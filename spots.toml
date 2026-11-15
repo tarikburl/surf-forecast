@@ -84,6 +84,23 @@ tide_station = "9413450"
 buoys = ["46042", "46236"]
 notes = "NW swell wraps in; low to mid tide"
 
+[cowells]
+name = "Cowells, Santa Cruz"
+lat = 36.9617
+lon = -122.0238
+# Cowells sits deep in the cove, 1.5 km from the nearest CDIP point, which is
+# the same one Steamer Lane uses. The small scale factor stands in for the
+# sheltering, so expect more error here than at open spots.
+mop = "SC149"
+a = 0.33
+mop_depth_m = 15.0
+shore_normal = 128
+window = [180, 300]
+tide_max = 1.1
+tide_station = "9413450"
+buoys = ["46042", "46236"]
+notes = "Very sheltered; needs a solid swell; lower tide"
+
 [pleasure_point]
 name = "Pleasure Point, Santa Cruz"
 lat = 36.954

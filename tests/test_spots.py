@@ -7,7 +7,7 @@ from surf.spots import load_spots
 
 def test_all_spots_load_and_are_sane():
     spots = load_spots()
-    assert len(spots) == 7
+    assert len(spots) == 8
     for s in spots.values():
         assert 36 < s["lat"] < 39 and -123 < s["lon"] < -121
         assert re.fullmatch(r"(SF|SM|SC)\d{3}", s["mop"])
